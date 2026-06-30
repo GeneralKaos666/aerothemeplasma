@@ -19,13 +19,18 @@ Window {
     onDone: destroy();
 
     minimumWidth: width
-    minimumHeight: height
+    minimumHeight: 1
     width: 418
-    height: column.height
+    height: column.implicitHeight
     maximumWidth: width
     maximumHeight: height
+    modality: Qt.WindowModal
 
     title: i18n("Desktop")
+
+    onClosing: {
+        destroy();
+    }
 
     FontMetrics { id: systemFont; font: color.font }
 
