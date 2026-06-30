@@ -140,12 +140,42 @@ if ! $SKIP_EXTERNAL; then
     fi
 
     # --- SMOD ---------------------------------------------------------------
-    if $IS_TERMUX; then
-        echo "Warning: SMOD not yet tested on Termux. Skipping."
-    elif ! $SKIP_SMOD; then
+    if ! $SKIP_SMOD; then
         clone_or_pull https://gitgud.io/aeroshell/smod.git smod Plasma/6.7
         cd smod
-        bash install.sh $@
+
+        if $IS_TERMUX; then
+            # Build main kdecoration plugin with Termux fixes
+            cmake $CMAKE_BASE $CMAKE_HACK -DBUILD_QT5=OFF -DBUILD_QT6=ON -B build . || exit 1
+            cmake --build build || exit 1
+            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
+            cp build/install_manifest.txt "$CUR_DIR/manifest/smod_install_manifest.txt"
+
+            # Build smodglow KWin effect (X11 only — no KWin Wayland on Termux)
+            cd smodglow
+            cmake $CMAKE_BASE $CMAKE_HACK -DKWIN_BUILD_WAYLAND=OFF -B build . || exit 1
+            cmake --build build || exit 1
+            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
+            cp build/install_manifest.txt "$CUR_DIR/manifest/smodglow-x11_install_manifest.txt"
+            cd ..
+
+            # Install KCM service registration file (missing from SMOD's CMake)
+            cat > "$INSTALL_PREFIX/share/kservices6/smoddecorationconfig.desktop" <<- KSERVICEEOF
+			[Desktop Entry]
+			Exec=kcmshell6 kcm_smoddecoration
+			Icon=preferences-system-windows
+			Type=Service
+			X-KDE-ServiceTypes=KCModule
+			X-KDE-Library=org.kde.kdecoration3/kcm_smoddecoration
+			X-KDE-PluginKeyword=kcmodule
+			X-KDE-ParentApp=kcontrol
+			X-KDE-Weight=40
+			Name=SMOD Window Decoration
+			Comment=Modify the appearance of SMOD window decorations
+			KSERVICEEOF
+        else
+            bash install.sh $@
+        fi
         if [[ -f build/install_manifest.txt ]]; then
             cp build/install_manifest.txt "$CUR_DIR/manifest/smod_install_manifest.txt"
         fi
