@@ -10,13 +10,13 @@ if [[ -n "$PREFIX" && "$PREFIX" == */com.termux/files/usr ]]; then
 fi
 
 # --- Privilege escalation ---------------------------------------------------
-SU_CMD=sudo
-if [[ -z "$(command -v $SU_CMD)" ]]; then
-    SU_CMD=doas
+if $IS_TERMUX; then
+    SU_CMD=""   # prefix is user-writable in Termux
+else
+    SU_CMD=sudo
     if [[ -z "$(command -v $SU_CMD)" ]]; then
-        if $IS_TERMUX; then
-            SU_CMD=""   # prefix is user-writable in Termux
-        else
+        SU_CMD=doas
+        if [[ -z "$(command -v $SU_CMD)" ]]; then
             echo "Neither sudo or doas were detected on the system."
             exit
         fi
@@ -141,9 +141,8 @@ if ! $SKIP_EXTERNAL; then
 
     # --- SMOD ---------------------------------------------------------------
     if $IS_TERMUX; then
-        echo "Warning: SMOD not yet tested on Termux. Use --skip-smod or clone manually."
-    fi
-    if ! $SKIP_SMOD; then
+        echo "Warning: SMOD not yet tested on Termux. Skipping."
+    elif ! $SKIP_SMOD; then
         clone_or_pull https://gitgud.io/aeroshell/smod.git smod Plasma/6.7
         cd smod
         bash install.sh $@
