@@ -134,7 +134,7 @@ pkg install plasma-workspace plasma-desktop kwin-x11 libplasma \
 ### Full install (root repo + external repos)
 
 ```bash
-bash install.sh --skip-libplasma --skip-uac --skip-smod --skip-sddm-kcm
+bash install.sh --skip-libplasma --skip-uac --skip-sddm-kcm
 ```
 
 Install all theme assets, QML plasmoids, Plasma shell, KWin C++ effects (AeroGlassBlur,
@@ -147,7 +147,7 @@ The `--skip-*` flags skip external repos that are not yet ready on Termux:
 |------|------|-------|
 | `--skip-libplasma` | libplasma fork | Builds but takes very long; unneeded if system libplasma matches |
 | `--skip-uac` | uac-polkit-agent | Needs `polkit-qt6-1` (not in Termux repos) |
-| `--skip-smod` | SMOD kdecoration | Not yet tested on Termux |
+| `--skip-smod` | SMOD kdecoration | Builds and works on Termux since 2025-06 |
 | `--skip-sddm-kcm` | aeroshell-sddm-kcm | Needs SDDM (not in Termux repos) |
 | `--skip-external` | All of the above | Use to skip all external repos |
 
@@ -195,8 +195,8 @@ cmake --install build --prefix $PREFIX
 | `uac-polkit-agent` | Needs `polkit-qt6-1` (not packaged in Termux) |
 | `aeroshell-sddm-kcm` | Needs SDDM (not packaged in Termux) |
 | `libplasma` fork (external) | Buildable but long; system package may suffice |
-| SMOD kdecoration | Not yet tested |
-
+| SMOD kdecoration | Builds and works since 2025-06 (X11 only; smodglow Wayland skipped) |
+ 
 ### Key Termux adaptations in this repo
 
 - `cmake/FindKWin.cmake` — wraps `KWinX11` CMake target as `KWin::kwin`
