@@ -1,0 +1,2 @@
+/data/data/com.termux/files/usr/bin/startatp
+/data/data/com.termux/files/usr/share/xsessions/aerothemeplasmax11.desktop

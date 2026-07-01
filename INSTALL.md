@@ -20,7 +20,7 @@ Before installing AeroThemePlasma, it's important to know which display server y
 Required packages:
 
 ```bash
-pacman -S git cmake extra-cmake-modules ninja curl unzip qt6-virtualkeyboard qt6-multimedia qt6-5compat qt6-wayland plasma-wayland-protocols wayland-protocols vulkan-headers plasma5support kvantum sddm sddm-kcm base-devel plasma-nm plasma-pa plasma-workspace plasma-desktop
+pacman -S git cmake extra-cmake-modules ninja curl unzip qt6-virtualkeyboard qt6-multimedia qt6-5compat qt6-wayland plasma-wayland-protocols plasma5support kvantum sddm sddm-kcm base-devel plasma-nm plasma-pa plasma-workspace plasma-desktop
 ```
 
 Since Plasma 6.4, the X11 session has been separated from the main codebase. On Arch Linux, additional dependencies for X11 include:
@@ -50,7 +50,7 @@ On Fedora, additional dependencies for X11 include:
 Required packages:
 
 ```bash
-zypper install cmake gcc gcc-c++ gmp-ecm-devel kdecoration6-devel kf6-attica-devel kf6-extra-cmake-modules kf6-karchive-devel kf6-kauth-devel kf6-kbookmarks-devel kf6-kcmutils-devel kf6-kcodecs-devel kf6-kcolorscheme-devel kf6-kcompletion-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcoreaddons-devel kf6-kcrash-devel kf6-kdbusaddons-devel kf6-kglobalaccel-devel kf6-kguiaddons-devel kf6-ki18n-devel kf6-kiconthemes-devel kf6-kio-devel kf6-kirigami-devel kf6-kitemviews-devel kf6-kjobwidgets-devel kf6-knewstuff-devel kf6-knotifications-devel kf6-knotifyconfig-devel kf6-kpackage-devel kf6-krunner-devel kf6-kservice-devel kf6-ksvg-devel kf6-kwidgetsaddons-devel kf6-kwindowsystem-devel kf6-kxmlgui-devel kf6-qqc2-desktop-style-devel kf6-solid-devel kf6-sonnet-devel knotifications-devel kwin6-devel kwin6-x11-devel libepoxy-devel libksysguard6-devel libplasma6-devel libpolkit-qt6-1-devel make ninja plasma-wayland-protocols plasma5support6-devel plasma6-activities-devel plasma6-activities-stats-devel plasma6-workspace-devel qt6-base-devel qt6-gui-private-devel qt6-qt5compat-devel qt6-quick-devel qt6-quickcontrols2-devel qt6-quicktest-devel qt6-quickwidgets-devel qt6-svg-devel qt6-uitools-devel qt6-wayland-devel qt6-waylandclient-private-devel wayland-protocols-devel
+zypper install cmake make ninja gcc gcc-c++ gmp-ecm-devel kf6-extra-cmake-modules qt6-base-devel qt6-quick-devel qt6-svg-devel qt6-quickcontrols2-devel kf6-kwindowsystem-devel kf6-karchive-devel kf6-kirigami-devel kf6-kbookmarks-devel kf6-kcodecs-devel kf6-kcolorscheme-devel kf6-kcompletion-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcoreaddons-devel kf6-kguiaddons-devel kf6-ki18n-devel kf6-kio-devel kf6-kitemviews-devel kf6-kjobwidgets-devel kf6-kservice-devel kf6-kwidgetsaddons-devel kf6-kxmlgui-devel kf6-solid-devel kf6-kglobalaccel-devel kf6-kiconthemes-devel kf6-knotifications-devel kf6-kpackage-devel kf6-ksvg-devel plasma6-activities-devel plasma-wayland-protocols qt6-wayland-devel qt6-quicktest-devel qt6-gui-private-devel kdecoration6-devel kf6-kcmutils-devel qt6-uitools-devel kf6-kcrash-devel libepoxy-devel kwin6-devel kwin6-x11-devel kf6-qqc2-desktop-style-devel knotifications-devel kf6-kauth-devel libplasma6-devel plasma5support6-devel plasma6-activities-stats-devel plasma6-workspace-devel
 ```
 
 In openSUSE, additional dependencies for X11 include:
@@ -67,10 +67,6 @@ On Ubuntu, additional dependencies for X11 include:
 
 - `kwin-x11`
 - `kwin-x11-dev`
-
-### Gentoo 
-
-Check out [AeroShell Gentoo Overlay](https://gitgud.io/CCF100/aeroshell-gentoo-overlay) by [Chloe Christine Fontenot](https://gitgud.io/CCF100)
 
 ## Migration notice <a name="migration"></a>
 
@@ -176,7 +172,6 @@ Update and do `git pull` on the cloned repository to get new changes:
 ```bash
 $ cd /path/to/aerothemeplasma
 $ git pull
-$ git checkout "Plasma/6.7" # Switch to a new branch, if needed
 ```
 
 Re-run the install script as described in [Getting started](#started). The script will automatically pull changes for all cloned repositories and rebuild them. In case something needs to be rebuilt completely, simply delete the repository folder causing the build error, and re-run the install script.
@@ -200,7 +195,7 @@ $ sudo pacman -S libplasma
 
 ### Fonts 
 
-On Arch Linux, use [this script](https://gitgud.io/aeroshell/aeroshell-workspace/-/blob/Plasma/6.7/scripts/install_fonts_arch.sh) to extract fonts and install them as an Arch package from a valid Windows 7 ISO. A 32-bit Windows 7 ISO is recommended for faster download speeds.
+On Arch Linux, use [this script](https://gitgud.io/aeroshell/aeroshell-workspace/-/blob/Plasma/6.6/scripts/install_fonts_arch.sh) to extract fonts and install them as an Arch package from a valid Windows 7 ISO. A 32-bit Windows 7 ISO is recommended for faster download speeds.
 
 ## Optional <a name="optional"></a>
 
