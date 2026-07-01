@@ -1,267 +1,230 @@
 #!/bin/bash
-CUR_DIR=${PWD}
+CUR_DIR="${PWD}"
 
-BRANCH_VERSION="Plasma/6.7"
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-${PREFIX:-/usr}}"
+TERMUX_INSTALL=0
 
-# --- Termux detection -------------------------------------------------------
-IS_TERMUX=false
-if [[ -n "$PREFIX" && "$PREFIX" == */com.termux/files/usr ]]; then
-    IS_TERMUX=true
+if [[ -n "${PREFIX}" && "${INSTALL_PREFIX}" == "${PREFIX}" ]]; then
+    TERMUX_INSTALL=1
 fi
 
-# --- Privilege escalation ---------------------------------------------------
-if $IS_TERMUX; then
-    SU_CMD=""   # prefix is user-writable in Termux
-else
+run_install_cmd() {
+    if [[ -n "${SU_CMD}" ]]; then
+        "${SU_CMD}" "$@"
+    else
+        "$@"
+    fi
+}
+
+clone_or_update_repo() {
+    local repo_url="$1"
+    local repo_dir="$2"
+
+    if [[ -d "${repo_dir}/.git" ]]; then
+        git -C "${repo_dir}" pull --ff-only || exit 1
+    elif [[ -e "${repo_dir}" ]]; then
+        echo "Path '${repo_dir}' already exists but is not a git checkout."
+        exit 1
+    else
+        git clone "${repo_url}" "${repo_dir}" || exit 1
+    fi
+}
+
+if [[ "${TERMUX_INSTALL}" -eq 0 ]]; then
     SU_CMD=sudo
-    if [[ -z "$(command -v $SU_CMD)" ]]; then
+    if [[ -z "$(command -v "${SU_CMD}")" ]]; then
         SU_CMD=doas
-        if [[ -z "$(command -v $SU_CMD)" ]]; then
+        if [[ -z "$(command -v "${SU_CMD}")" ]]; then
             echo "Neither sudo or doas were detected on the system."
-            exit
+            exit 1
         fi
     fi
+else
+    SU_CMD=
 fi
 
-# --- Distro paths -----------------------------------------------------------
-if $IS_TERMUX; then
+if [[ -z "${LIBEXEC_DIR}" ]]; then
     LIBEXEC_DIR=lib
-    UAC_LIBEXEC_DIR=lib
-elif [ -z $LIBEXEC_DIR ]; then
-    LIBEXEC_DIR=lib
-    UAC_LIBEXEC_DIR=lib
 fi
 
-if [[ "$(command -v dnf)" ]]; then
+if [[ -z "${UAC_LIBEXEC_DIR}" ]]; then
+    UAC_LIBEXEC_DIR="${LIBEXEC_DIR}"
+fi
+
+if [[ "$(command -v dnf)" ]]; then # Automatically change for Fedora
     LIBEXEC_DIR=libexec
     UAC_LIBEXEC_DIR=libexec/kf6
 fi
 
-# --- Termux-specific flags --------------------------------------------------
-if $IS_TERMUX; then
-    INSTALL_PREFIX="$PREFIX"
-    QML_HACK="$CUR_DIR/cmake/TermuxQt6AndroidHack.cmake"
-    ROOT_EXTRA_FLAGS="-DBUILD_ATPOOTB=OFF -DBUILD_CXX_PLASMOIDS=OFF"
-    KWIN_EXTRA_FLAGS="-DKWIN_BUILD_WAYLAND=OFF"
-    # Symlink KWinDBusInterface -> KWinX11DBusInterface if needed
-    if [[ -d "$PREFIX/lib/cmake/KWinX11DBusInterface" && ! -d "$PREFIX/lib/cmake/KWinDBusInterface" ]]; then
-        mkdir -p "$PREFIX/lib/cmake/KWinDBusInterface"
-        cp "$PREFIX/lib/cmake/KWinX11DBusInterface/KWinX11DBusInterfaceConfig.cmake" \
-           "$PREFIX/lib/cmake/KWinDBusInterface/KWinDBusInterfaceConfig.cmake"
-        echo "Created KWinDBusInterface cmake shim"
+if [[ "${TERMUX_INSTALL}" -eq 1 ]]; then
+    # Termux places libexec binaries under lib/libexec/
+    if [[ -x "${INSTALL_PREFIX}/libexec/plasma-dbus-run-session-if-needed" ]]; then
+        LIBEXEC_DIR=libexec
+    elif [[ -x "${INSTALL_PREFIX}/lib/libexec/plasma-dbus-run-session-if-needed" ]]; then
+        LIBEXEC_DIR=lib/libexec
+    elif [[ -x "${INSTALL_PREFIX}/lib/plasma-dbus-run-session-if-needed" ]]; then
+        LIBEXEC_DIR=lib
     fi
-    # Symlink KWin -> KWinX11 so find_package(KWin) works
-    if [[ -d "$PREFIX/lib/cmake/KWinX11" && ! -d "$PREFIX/lib/cmake/KWin" ]]; then
-        ln -sf "$PREFIX/lib/cmake/KWinX11" "$PREFIX/lib/cmake/KWin"
-        echo "Created KWin cmake compat symlink"
+
+    if [[ -x "${INSTALL_PREFIX}/libexec/kf6/polkit-kde-authentication-agent-1" ]]; then
+        UAC_LIBEXEC_DIR=libexec/kf6
+    elif [[ -x "${INSTALL_PREFIX}/lib/libexec/kf6/polkit-kde-authentication-agent-1" ]]; then
+        UAC_LIBEXEC_DIR=lib/libexec/kf6
+    elif [[ -x "${INSTALL_PREFIX}/libexec/polkit-kde-authentication-agent-1" ]]; then
+        UAC_LIBEXEC_DIR=libexec
+    elif [[ -x "${INSTALL_PREFIX}/lib/libexec/polkit-kde-authentication-agent-1" ]]; then
+        UAC_LIBEXEC_DIR=lib/libexec
+    elif [[ -x "${INSTALL_PREFIX}/lib/polkit-kde-authentication-agent-1" ]]; then
+        UAC_LIBEXEC_DIR=lib
     fi
-else
-    INSTALL_PREFIX="/usr"
-    QML_HACK=""
-    ROOT_EXTRA_FLAGS=""
-    KWIN_EXTRA_FLAGS="-DKWIN_BUILD_WAYLAND=ON"
 fi
 
-# --- Shared CMake prefix for all repos --------------------------------------
-CMAKE_BASE="-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX"
-CMAKE_HACK="-DCMAKE_PROJECT_INCLUDE=$QML_HACK"
+export CMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
+export LIBEXEC_DIR
+export UAC_LIBEXEC_DIR
 
-# --- Help / skip-external ---------------------------------------------------
-SKIP_EXTERNAL=false
-SKIP_LIBPLASMA=false
-SKIP_UAC=false
-SKIP_SMOD=false
-SKIP_SDDM_KCM=false
-for arg in "$@"; do
-    [[ "$arg" == "--skip-external" ]]  && SKIP_EXTERNAL=true
-    [[ "$arg" == "--skip-libplasma" ]] && SKIP_LIBPLASMA=true
-    [[ "$arg" == "--skip-uac" ]]       && SKIP_UAC=true
-    [[ "$arg" == "--skip-smod" ]]      && SKIP_SMOD=true
-    [[ "$arg" == "--skip-sddm-kcm" ]]  && SKIP_SDDM_KCM=true
-done
-if $SKIP_EXTERNAL; then
-    SKIP_LIBPLASMA=true
-    SKIP_UAC=true
-    SKIP_SMOD=true
-    SKIP_SDDM_KCM=true
-fi
+CMAKE_CONFIGURE_ARGS=()
 
-# Helper: clone or pull a repo, checkout branch with fallback
-clone_or_pull() {
-    local url="$1"
-    local dir="$2"
-    local branch="$3"
-    if [[ ! -d "$dir" ]]; then
-        git clone --depth 1 "$url" "$dir" || return 1
-    fi
-    cd "$dir" || return 1
-    git pull --ff-only 2>/dev/null || true
-    # Try the requested branch, fall back to master
-    if git show-ref --verify --quiet "refs/heads/$branch"; then
-        git checkout "$branch" 2>/dev/null || true
-    fi
-    cd "$CUR_DIR/repos"
-}
-
-# ============================================================================
-# Build external repos
-# ============================================================================
 mkdir -p repos
 mkdir -p manifest
 
+if [[ "${TERMUX_INSTALL}" -eq 1 ]]; then
+    # Termux's GCC has broken OpenMP CXX support; clang works correctly.
+    export CC=clang
+    export CXX=clang++
+
+    TERMUX_QT_SHIM="${CUR_DIR}/manifest/termux-qt-shim.cmake"
+    cat > "${TERMUX_QT_SHIM}" <<'EOF'
+if(NOT COMMAND _qt_internal_collect_qml_root_paths)
+    function(_qt_internal_collect_qml_root_paths target)
+    endfunction()
+endif()
+if(NOT COMMAND qt6_android_apply_arch_suffix)
+    function(qt6_android_apply_arch_suffix target)
+    endfunction()
+endif()
+EOF
+    CMAKE_CONFIGURE_ARGS+=("-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=${TERMUX_QT_SHIM}")
+    CMAKE_CONFIGURE_ARGS+=("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+
+    # Termux ships KWin as KWinX11; provide a shim so find_package(KWin) works.
+    TERMUX_KWIN_SHIM_DIR="${CUR_DIR}/manifest/cmake"
+    CMAKE_CONFIGURE_ARGS+=("-DCMAKE_PREFIX_PATH=${TERMUX_KWIN_SHIM_DIR}")
+fi
+
 cd repos
 
-if ! $SKIP_EXTERNAL; then
-    # --- libplasma ----------------------------------------------------------
-    if ! $SKIP_LIBPLASMA; then
-        clone_or_pull https://gitgud.io/aeroshell/libplasma.git libplasma Plasma/6.7
-        cd libplasma
-        cmake $CMAKE_BASE $CMAKE_HACK -B build . || exit 1
-        cmake --build build || exit 1
-        ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-        cp build/install_manifest.txt "$CUR_DIR/manifest/libplasma_install_manifest.txt"
-        cd "$CUR_DIR/repos"
-    fi
+# libplasma last
+clone_or_update_repo https://gitgud.io/aeroshell/libplasma.git libplasma
+cd libplasma
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/libplasma_install_manifest.txt"
+cd "$CUR_DIR/repos"
 
-    # --- uac-polkit-agent ---------------------------------------------------
-    if ! $SKIP_UAC; then
-        if $IS_TERMUX; then
-            echo "Warning: uac-polkit-agent needs polkit-qt6-1 (not in Termux repos). Skipping."
-            echo "Use --skip-uac to silence this message."
-        else
-            clone_or_pull https://gitgud.io/aeroshell/uac-polkit-agent.git uac-polkit-agent Plasma/6.7
-            cd uac-polkit-agent
-            cmake $CMAKE_BASE -DCMAKE_INSTALL_LIBEXECDIR=$UAC_LIBEXEC_DIR $CMAKE_HACK -B build . || exit 1
-            cmake --build build || exit 1
-            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-            cp build/install_manifest.txt "$CUR_DIR/manifest/uac-polkit-agent_install_manifest.txt"
-            cd "$CUR_DIR/repos"
-        fi
-    fi
+# uac-polkit-agent
+#clone_or_update_repo https://gitgud.io/aeroshell/uac-polkit-agent.git uac-polkit-agent
+#cd uac-polkit-agent
+#cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DCMAKE_INSTALL_LIBEXECDIR="${UAC_LIBEXEC_DIR}" -B build . || exit 1
+#cmake --build build || exit 1
+#run_install_cmd cmake --install build || exit 1
+#cp build/install_manifest.txt "$CUR_DIR/manifest/uac-polkit-agent_install_manifest.txt"
+#cd "$CUR_DIR/repos"
 
-    # --- SMOD ---------------------------------------------------------------
-    if ! $SKIP_SMOD; then
-        clone_or_pull https://gitgud.io/aeroshell/smod.git smod Plasma/6.7
-        cd smod
+# SMOD
+clone_or_update_repo https://gitgud.io/aeroshell/smod.git smod
+cd smod
+if [[ "${TERMUX_INSTALL}" -eq 1 ]]; then
+    sed -i "s|/usr|\${CMAKE_INSTALL_PREFIX}|g" install.sh smodglow/install.sh
+    sed -i "s|\$SU_CMD||g" install.sh smodglow/install.sh
+    sed -i "s|exit||g" install.sh smodglow/install.sh
+fi
+bash install.sh "$@"
+cp build/install_manifest.txt "$CUR_DIR/manifest/smod_install_manifest.txt"
 
-        if $IS_TERMUX; then
-            # Build main kdecoration plugin with Termux fixes
-            cmake $CMAKE_BASE $CMAKE_HACK -DBUILD_QT5=OFF -DBUILD_QT6=ON -B build . || exit 1
-            cmake --build build || exit 1
-            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-            cp build/install_manifest.txt "$CUR_DIR/manifest/smod_install_manifest.txt"
-
-            # Build smodglow KWin effect (X11 only — no KWin Wayland on Termux)
-            cd smodglow
-            cmake $CMAKE_BASE $CMAKE_HACK -DKWIN_BUILD_WAYLAND=OFF -B build . || exit 1
-            cmake --build build || exit 1
-            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-            cp build/install_manifest.txt "$CUR_DIR/manifest/smodglow-x11_install_manifest.txt"
-            cd ..
-
-            # Install KCM service registration file (missing from SMOD's CMake)
-            cat > "$INSTALL_PREFIX/share/kservices6/smoddecorationconfig.desktop" <<- KSERVICEEOF
-			[Desktop Entry]
-			Exec=kcmshell6 kcm_smoddecoration
-			Icon=preferences-system-windows
-			Type=Service
-			X-KDE-ServiceTypes=KCModule
-			X-KDE-Library=org.kde.kdecoration3/kcm_smoddecoration
-			X-KDE-PluginKeyword=kcmodule
-			X-KDE-ParentApp=kcontrol
-			X-KDE-Weight=40
-			Name=SMOD Window Decoration
-			Comment=Modify the appearance of SMOD window decorations
-			KSERVICEEOF
-        else
-            bash install.sh $@
-        fi
-        if [[ -f build/install_manifest.txt ]]; then
-            cp build/install_manifest.txt "$CUR_DIR/manifest/smod_install_manifest.txt"
-        fi
-        if [[ -f smodglow/build-wl/install_manifest.txt ]]; then
-            cp smodglow/build-wl/install_manifest.txt "$CUR_DIR/manifest/smodglow_install_manifest.txt"
-        fi
-        if [[ ! "$*" == *"--skip-x11"* ]] && [[ -f smodglow/build/install_manifest.txt ]]; then
-            cp smodglow/build/install_manifest.txt "$CUR_DIR/manifest/smodglow-x11_install_manifest.txt"
-        fi
-        cd "$CUR_DIR/repos"
-    fi
-
-    # --- Aeroshell Workspace ------------------------------------------------
-    clone_or_pull https://gitgud.io/aeroshell/aeroshell-workspace.git aeroshell-workspace Plasma/6.7
-    cd aeroshell-workspace
-    cmake $CMAKE_BASE $CMAKE_HACK -B build . || exit 1
-    cmake --build build || exit 1
-    ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-    ${SU_CMD} update-mime-database "$INSTALL_PREFIX/share/mime"
-    cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-workspace_install_manifest.txt"
-    cd "$CUR_DIR/repos"
-
-    # --- Aeroshell KWin components ------------------------------------------
-    clone_or_pull https://gitgud.io/aeroshell/aeroshell-kwin-components.git aeroshell-kwin-components Plasma/6.7
-    cd aeroshell-kwin-components
-    cmake $CMAKE_BASE $CMAKE_HACK $KWIN_EXTRA_FLAGS -B build . || exit 1
-    cmake --build build || exit 1
-    ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-    cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-kwin-components_install_manifest.txt"
-    if [[ ! "$*" == *"--skip-x11"* ]]; then
-        cmake $CMAKE_BASE $CMAKE_HACK $KWIN_EXTRA_FLAGS -DKWIN_INSTALL_MISC=OFF -B build_x11 . || exit 1
-        cmake --build build_x11 || exit 1
-        ${SU_CMD} cmake --install build_x11 --prefix "$INSTALL_PREFIX" || exit 1
-        cp build_x11/install_manifest.txt "$CUR_DIR/manifest/aeroshell-kwin-components-x11_install_manifest.txt"
-    fi
-    cd "$CUR_DIR/repos"
-
-    # --- Aeroshell SDDM KCM -------------------------------------------------
-    if ! $SKIP_SDDM_KCM; then
-        if $IS_TERMUX; then
-            echo "Warning: aeroshell-sddm-kcm needs SDDM (not in Termux repos). Skipping."
-        else
-            clone_or_pull https://gitgud.io/aeroshell/aeroshell-sddm-kcm.git aeroshell-sddm-kcm Plasma/6.7
-            cd aeroshell-sddm-kcm
-            cmake $CMAKE_BASE $CMAKE_HACK -B build . || exit 1
-            cmake --build build || exit 1
-            ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-            cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-sddm-kcm_install_manifest.txt"
-            cd "$CUR_DIR/repos"
-        fi
-    fi
-
-    # --- Aerothemeplasma icons ----------------------------------------------
-    clone_or_pull https://gitgud.io/aeroshell/atp/aerothemeplasma-icons aerothemeplasma-icons master
-    cd aerothemeplasma-icons
-    cmake $CMAKE_BASE -B build . || exit 1
-    cmake --build build || exit 1
-    ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-    cp build/install_manifest.txt "$CUR_DIR/manifest/icons_install_manifest.txt"
-    cd "$CUR_DIR/repos"
-
-    # --- Aerothemeplasma sounds ---------------------------------------------
-    clone_or_pull https://gitgud.io/aeroshell/atp/aerothemeplasma-sounds aerothemeplasma-sounds master
-    cd aerothemeplasma-sounds
-    cmake $CMAKE_BASE -B build . || exit 1
-    cmake --build build || exit 1
-    ${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-    cp build/install_manifest.txt "$CUR_DIR/manifest/sounds_install_manifest.txt"
-    cd "$CUR_DIR/repos"
+if [[ ! "$*" == *"--skip-wayland"* ]]
+then
+    cp smodglow/build-wl/install_manifest.txt "$CUR_DIR/manifest/smodglow_install_manifest.txt"
 fi
 
-# ============================================================================
-# Build root repo (AeroThemePlasma)
-# ============================================================================
-cd "$CUR_DIR"
-cmake $CMAKE_BASE -DCMAKE_INSTALL_LIBEXECDIR=$LIBEXEC_DIR $CMAKE_HACK $ROOT_EXTRA_FLAGS -B build . || exit 1
+if [[ ! "$*" == *"--skip-x11"* ]]
+then
+    cp smodglow/build/install_manifest.txt "$CUR_DIR/manifest/smodglow-x11_install_manifest.txt"
+fi
+cd "$CUR_DIR/repos"
+
+# Aeroshell Workspace
+clone_or_update_repo https://gitgud.io/aeroshell/aeroshell-workspace.git aeroshell-workspace
+cd aeroshell-workspace
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -B build . || exit 1
 cmake --build build || exit 1
-${SU_CMD} cmake --install build --prefix "$INSTALL_PREFIX" || exit 1
-cp build/install_manifest.txt "$CUR_DIR/manifest/aerothemeplasma_install_manifest.txt"
-if [[ ! "$*" == *"--skip-x11"* ]] && ! $IS_TERMUX; then
-    # X11 build is only needed on non-Termux (Termux uses kwin-x11 natively)
-    cmake $CMAKE_BASE -DCMAKE_INSTALL_LIBEXECDIR=$LIBEXEC_DIR $CMAKE_HACK $ROOT_EXTRA_FLAGS -DINSTALL_X11_COMPONENTS=ON -B build_x11 . || exit 1
+run_install_cmd cmake --install build || exit 1
+if command -v update-mime-database >/dev/null 2>&1; then
+    run_install_cmd update-mime-database "${INSTALL_PREFIX}/share/mime"
+fi
+cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-workspace_install_manifest.txt"
+cd "$CUR_DIR/repos"
+
+if [[ ! "$*" == *"--skip-wayland"* ]]; then
+# Aeroshell KWin
+clone_or_update_repo https://gitgud.io/aeroshell/aeroshell-kwin-components.git aeroshell-kwin-components
+cd aeroshell-kwin-components
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DKWIN_BUILD_WAYLAND=ON -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-kwin-components_install_manifest.txt"
+if [[ ! "$*" == *"--skip-x11"* ]]
+then
+    cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DKWIN_BUILD_WAYLAND=OFF -DKWIN_INSTALL_MISC=OFF -B build_x11 . || exit 1
     cmake --build build_x11 || exit 1
-    ${SU_CMD} cmake --install build_x11 --prefix "$INSTALL_PREFIX" || exit 1
+    run_install_cmd cmake --install build_x11 || exit 1
+    cp build_x11/install_manifest.txt "$CUR_DIR/manifest/aeroshell-kwin-components-x11_install_manifest.txt"
+fi
+cd "$CUR_DIR/repos"
+fi
+
+# Aeroshell SDDM KCM
+clone_or_update_repo https://gitgud.io/aeroshell/aeroshell-sddm-kcm.git aeroshell-sddm-kcm
+cd aeroshell-sddm-kcm
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/aeroshell-sddm-kcm_install_manifest.txt"
+cd "$CUR_DIR/repos"
+
+# Aerothemeplasma icons
+clone_or_update_repo https://gitgud.io/aeroshell/atp/aerothemeplasma-icons aerothemeplasma-icons
+cd aerothemeplasma-icons
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/icons_install_manifest.txt"
+cd "$CUR_DIR/repos"
+
+# Aerothemeplasma sounds
+clone_or_update_repo https://gitgud.io/aeroshell/atp/aerothemeplasma-sounds aerothemeplasma-sounds
+cd aerothemeplasma-sounds
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/sounds_install_manifest.txt"
+cd "$CUR_DIR/repos"
+
+# Aerothemeplasma
+cd "$CUR_DIR"
+cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DCMAKE_INSTALL_LIBEXECDIR="${LIBEXEC_DIR}" -B build . || exit 1
+cmake --build build || exit 1
+run_install_cmd cmake --install build || exit 1
+cp build/install_manifest.txt "$CUR_DIR/manifest/aerothemeplasma_install_manifest.txt"
+if [[ ! "$*" == *"--skip-x11"* ]]
+then
+    cmake "${CMAKE_CONFIGURE_ARGS[@]}" -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DCMAKE_INSTALL_LIBEXECDIR="${LIBEXEC_DIR}" -DINSTALL_X11_COMPONENTS=ON -B build_x11 . || exit 1
+    cmake --build build_x11 || exit 1
+    run_install_cmd cmake --install build_x11 || exit 1
     cp build_x11/install_manifest.txt "$CUR_DIR/manifest/aerothemeplasma-x11_install_manifest.txt"
 fi
-cd "$CUR_DIR"
+cd "$CUR_DIR/repos"
+
 
 echo "Done."
