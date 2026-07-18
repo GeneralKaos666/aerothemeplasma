@@ -31,7 +31,6 @@ target_link_libraries(io.gitgud.wackyideas.volume
                       KF6::CoreAddons)
 
 
-include_directories(/usr/include/Plasma /usr/include/PlasmaQuick /usr/include/KF6/KConfigCore/ /usr/include/KF6/KConfig/ /usr/include/KF6/KCoreAddons/)
 
 install(TARGETS io.gitgud.wackyideas.volume DESTINATION ${KDE_INSTALL_PLUGINDIR}/plasma/applets)
 

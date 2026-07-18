@@ -18,10 +18,9 @@ target_link_libraries(io.gitgud.wackyideas.SevenStart
         KF6::ConfigCore
         KF6::ConfigGui
         KF6::CoreAddons
-        Plasma
-        PlasmaQuick
+        Plasma::Plasma
+        Plasma::PlasmaQuick
 )
 
-include_directories(/usr/include/Plasma /usr/include/KF6/KConfigCore/ /usr/include/KF6/KConfig/ /usr/include/KF6/KCoreAddons/ /usr/include/PlasmaQuick/)
 
 install(TARGETS io.gitgud.wackyideas.SevenStart DESTINATION ${KDE_INSTALL_PLUGINDIR}/plasma/applets)

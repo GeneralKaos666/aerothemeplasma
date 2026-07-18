@@ -29,3 +29,12 @@ if(NOT COMMAND qt6_android_build_apk)
     function(qt6_android_build_apk)
     endfunction()
 endif()
+if(TARGET Plasma::Plasma)
+    # Termux libplasma packages headers under include/Plasma/Plasma/
+    # (double namespace). Add include/Plasma so #include <Plasma/Applet>
+    # resolves to include/Plasma/Plasma/Applet (the actual file).
+    set_property(TARGET Plasma::Plasma APPEND PROPERTY
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/include/Plasma"
+    )
+endif()
+find_package(PlasmaQuick REQUIRED)
