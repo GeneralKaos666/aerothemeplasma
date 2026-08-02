@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"/data/data/com.termux/files/home/aerothemeplasma/build_x11/cmake_install.cmake",
+		"/data/data/com.termux/files/home/aerothemeplasma/build_x11/plasma/cmake_install.cmake",
+		"/data/data/com.termux/files/home/aerothemeplasma/build_x11/plasma/sddm/cmake_install.cmake",
+		"/data/data/com.termux/files/home/aerothemeplasma/build_x11/plasma/sddm/login-sessions/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

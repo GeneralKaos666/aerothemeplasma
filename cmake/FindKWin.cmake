@@ -1,0 +1,5 @@
+find_package(KWinX11 REQUIRED)
+if(KWinX11_FOUND AND NOT TARGET KWin::kwin)
+    add_library(KWin::kwin ALIAS KWinX11::kwin)
+endif()
+set(KWin_FOUND ${KWinX11_FOUND})

@@ -1,7 +1,5 @@
 # AeroThemePlasma
 
-## HIATUS NOTICE: This is a long overdue announcement, but development will slow down significantly as a result of real life priorities I have to take care of first. Estimated time until I continue development is unknown, but don't expect anything significant in the following few months, until August, probably. Thank you for your patience and support.
-
 ## Microsoft® Windows™ is a registered trademark of Microsoft® Corporation. This name is used for referential use only, and does not aim to usurp copyrights from Microsoft. Microsoft Ⓒ 2025 All rights reserved. All resources belong to Microsoft Corporation.
 
 ## Introduction
@@ -11,7 +9,7 @@ This is a project which aims to recreate the look and feel of Windows 7 as much 
 ATP is in constant development and testing, it has been tested on:
 
 - Arch Linux x64 and other Arch derivatives
-- Plasma 6.7.0, KDE Frameworks 6.27.0, Qt 6.11.1
+- Plasma 6.6.1, KDE Frameworks 6.23.0, Qt 6.10.2
 - 96 DPI scaling, multi monitor
 - X11, Wayland*
 
@@ -25,7 +23,68 @@ If you find my work valuable consider donating:
 
 <a href='https://ko-fi.com/M4M2NJ9PJ' target='_blank'><img height='42' style='border:0px;height:42px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
-[![](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/ZDeT6vdqMp)
+## GeneralKaos666 Edits
+
+# Termux Compatibility Fixes for AeroThemePlasma
+
+This document summarizes the changes made to the repository to enable successful compilation and installation within the Termux environment on Android.
+
+## Global Changes
+
+### 1. Position Independent Code (PIC) Support
+- **File:** `CMakeLists.txt`
+- **Action:** Added `set(CMAKE_POSITION_INDEPENDENT_CODE ON)`.
+- **Reason:** Required on AArch64 Termux to allow static libraries to be linked into shared objects, preventing relocation errors.
+
+### 2. Installation Script Automation
+- **File:** `install.sh`
+- **Action:** Added `-DCMAKE_POSITION_INDEPENDENT_CODE=ON` to the global `CMAKE_CONFIGURE_ARGS`.
+- **Reason:** Ensures that all external sub-repositories (libplasma, smod, etc.) are built with PIC support automatically.
+
+---
+
+## Component-Specific Fixes
+
+### 3. ATP OOTB Executable (`atpootb`)
+- **File:** `plasma/atpootb/src/CMakeLists.txt`
+- **Changes:**
+    - Replaced `qt_add_executable` with standard `add_executable`.
+    - Explicitly set installation destination to `${KDE_INSTALL_BINDIR}`.
+    - Updated DBus interface logic to use `find_file` searching for both `org.kde.kwin.Effects.xml` and the Termux-specific `kwin_x11_org.kde.kwin.Effects.xml`.
+- **Reason:** Fixed an issue where the build system produced a shared library instead of an ELF binary and couldn't find the KWin DBus interface.
+
+### 4. Hardcoded Path Removal (Main Repo)
+- **Files:**
+    - `plasma/plasmoids/src/sevenstart_src/src/CMakeLists.txt`
+    - `plasma/plasmoids/src/seventasks_src/src/CMakeLists.txt`
+    - `plasma/plasmoids/src/volume_src/src/CMakeLists.txt`
+- **Action:** Replaced `/usr/include` with `${CMAKE_INSTALL_PREFIX}/include`.
+- **Reason:** Standardizes header lookup to respect the Termux filesystem prefix.
+
+### 5. Sub-Repository Path Fixes
+- **Files:**
+    - `repos/aeroshell-sddm-kcm/src/CMakeLists.txt`
+    - `repos/aeroshell-kwin-components/effects_cpp/wayland/aeroglide/CMakeLists.txt`
+    - `repos/aeroshell-kwin-components/effects_cpp/wayland/startupfeedback/CMakeLists.txt`
+    - `repos/aeroshell-kwin-components/effects_cpp/x11/aeroglide/CMakeLists.txt`
+    - `repos/aeroshell-kwin-components/effects_cpp/x11/startupfeedback/CMakeLists.txt`
+- **Action:** Patched hardcoded `/usr/include` references to use portable CMake variables or the Termux prefix.
+
+---
+
+## System Integration & Portability
+
+### 6. Autostart Configuration
+- **File:** `misc/xdg/autostart/x-atpootb.desktop`
+- **Action:** Changed `Exec=/usr/bin/atpootb` to `Exec=atpootb`.
+- **Reason:** Allows the system to find the binary via the PATH environment variable, which is necessary since `/usr/bin/` does not exist in Termux.
+
+### 7. Python Shebangs
+- **Files:**
+    - `plasma/look-and-feel/authui7/contents/images/createspinner.py`
+    - `plasma/shells/io.gitgud.wackyideas.desktop/contents/images/spinner/createspinner.py`
+- **Action:** Updated shebangs from `#!/usr/bin/python3` to `#!/usr/bin/env python3`.
+- **Reason:** Ensures scripts run correctly regardless of where the Python binary is installed in the Termux prefix.
 
 [AeroThemePlasma](https://github.com/aeroshell-desktop/aerothemeplasma) and all of its AeroShell components are available as read-only [GitHub mirrors](https://github.com/aeroshell-desktop/).
 
@@ -77,29 +136,13 @@ Huge thanks to everyone who helped out along the way by contributing, testing, p
 - [LonghornThemePlasma](https://gitgud.io/catpswin56/longhornthemeplasma) by catpswin56
 - [VB1ThemePlasma](https://gitgud.io/catpswin56/vista-beta-plasma) by catpswin56
 - [Harmony](https://gitgud.io/catpswin56/harmony) by catpswin56
+- [Gadgets](https://gitgud.io/catpswin56/win-gadgets) by catpswin56
+- [WinXplorer](https://gitgud.io/catpswin56/winxplorer) by catpswin56
 - [SMOD Themes](https://gitgud.io/catpswin56/smod-themes) by catpswin56, a collection of themes that can be used with the SMOD window decoration theme
 - [X6Shell](https://gitgud.io/x6shell) by catpswin56
 - [Ice2K.sys](https://toiletflusher.neocities.org/ice2k/) by 0penrc
+- [Sevulet](https://gitgud.io/snailatte/sevulet) by [snailatte](https://gitgud.io/snailatte)
 - [AeroThemePlasma-Nix](https://github.com/nyakase/aerothemeplasma-nix/) by [nyakase](https://github.com/nyakase)
-
-## Vista variant
-
-Initially I wanted to make a Vista variant of AeroThemePlasma but [catpswin56](https://gitgud.io/catpswin56) beat me to it, use [VistaThemePlasma](https://gitgud.io/aeroshell/vtp/vistathemeplasma) if you want a Vista theme.
-
-## Aero apps for AeroThemePlasma
-- [Aero Dolphin](https://gitgud.io/atmk/dolphin-aero) by Albert Tomanek
-- [Aero GwenView](https://gitgud.io/atmk/gwenview-aero) by Albert Tomanek
-- [Aero KolourPaint](https://invent.kde.org/albert-tomanek/kolourpaint/-/tree/saribbon-aero) by Albert Tomanek
-- [Control Panel](https://github.com/actuallyaridan/linux-control) by ActuallyAridan
-- [Device Manager](https://github.com/actuallyaridan/linux-devmgmt) by ActuallyAridan
-- [TuxManager](https://github.com/benapetr/TuxManager) by benapetr
-- [Gadgets](https://gitgud.io/catpswin56/win-gadgets) by catpswin56
-- [WinXplorer](https://gitgud.io/catpswin56/winxplorer) by catpswin56
-- [execbin](https://gitgud.io/catpswin56/execbin) (run dialog) by catpswin56
-- [LinVer](https://gitgud.io/wackyideas/linver) (version dialog) by WackyIdeas
-- ~~[Sevulet](https://gitgud.io/snailatte/sevulet) by [snailatte](https://gitgud.io/snailatte)~~
-
-To install most of these, the commands to run after cloning are: `mkdir build; cd build; cmake .. -DCMAKE_INSTALL_PREFIX=/usr; sudo make install`.
 
 ## Screenshots
 
