@@ -9,7 +9,7 @@ set(plasmoids
     io.gitgud.wackyideas.volume
     io.gitgud.wackyideas.keyboardlayout
 
-    io.gitgud.wackyideas.SevenStart
+    #io.gitgud.wackyideas.SevenStart
     io.gitgud.wackyideas.seventasks
     io.gitgud.wackyideas.desktopcontainment
 )

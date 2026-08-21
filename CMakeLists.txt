@@ -5,8 +5,10 @@ set(KF6_MIN_VERSION "6.0.0")
 find_package(ECM ${KF6_MIN_VERSION} REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 
-set(PROJECT_VERSION "6.7.0")
+set(PROJECT_VERSION "6.7.1")
 set(PROJECT_VERSION_MAJOR 6)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(INSTALL_X11_COMPONENTS "Install X11 session files" OFF)
 
@@ -16,6 +18,9 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 find_package(KF6Config)
 find_package(Plasma)
+if(ANDROID)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/TermuxQt6AndroidHack.cmake)
+endif()
 
 add_subdirectory(plasma)
 if(NOT INSTALL_X11_COMPONENTS)
